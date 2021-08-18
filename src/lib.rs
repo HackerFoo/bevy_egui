@@ -360,7 +360,7 @@ impl Plugin for EguiPlugin {
         app.add_stage_before(
             RenderStage::RenderResource,
             EguiStage::UiFrameEnd,
-            SystemStage::parallel(),
+            SystemStage::single_threaded(),
         );
 
         app.add_system_to_stage(
