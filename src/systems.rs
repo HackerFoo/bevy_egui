@@ -11,6 +11,7 @@ use bevy::{
         keyboard::KeyCode,
         mouse::{MouseButton, MouseScrollUnit, MouseWheel},
         Input,
+        touch::TouchInput
     },
     utils::HashMap,
     window::{
@@ -23,6 +24,7 @@ use bevy::{
 pub struct InputEvents<'w, 's> {
     ev_cursor_left: EventReader<'w, 's, CursorLeft>,
     ev_cursor: EventReader<'w, 's, CursorMoved>,
+    ev_touch_input: EventReader<'w, 's, TouchInput>,
     ev_mouse_wheel: EventReader<'w, 's, MouseWheel>,
     ev_received_character: EventReader<'w, 's, ReceivedCharacter>,
     ev_window_focused: EventReader<'w, 's, WindowFocused>,
@@ -164,13 +166,12 @@ pub fn process_input(
             )));
     }
 
+    let focused_egui_input = input_resources
+        .egui_input
+        .get_mut(&*window_resources.focused_window)
+        .unwrap();
+    let events = &mut focused_egui_input.raw_input.events;
     if let Some((x, y)) = egui_context.mouse_position {
-        let focused_egui_input = input_resources
-            .egui_input
-            .get_mut(&*window_resources.focused_window)
-            .unwrap();
-        let events = &mut focused_egui_input.raw_input.events;
-
         let pos = egui::pos2(x, y);
         process_mouse_button_event(
             events,
@@ -193,6 +194,24 @@ pub fn process_input(
             &input_resources.mouse_button_input,
             MouseButton::Middle,
         );
+    }
+
+    for touch in input_events.ev_touch_input.iter() {
+        events.push(egui::Event::Touch {
+            device_id: egui::TouchDeviceId(0),
+            id: egui::TouchId(touch.id),
+            phase: match touch.phase {
+                bevy::input::touch::TouchPhase::Started =>   egui::TouchPhase::Start,
+                bevy::input::touch::TouchPhase::Moved =>     egui::TouchPhase::Move,
+                bevy::input::touch::TouchPhase::Ended =>     egui::TouchPhase::End,
+                bevy::input::touch::TouchPhase::Cancelled => egui::TouchPhase::Cancel
+            },
+            pos: <[f32; 2]>::from(touch.position).into(),
+            force: touch.force.map(|f| match f {
+                bevy::input::touch::ForceTouch::Calibrated { force, .. } => force,
+                bevy::input::touch::ForceTouch::Normalized(force) => force
+            } as f32).unwrap_or(0.0)
+        });
     }
 
     if !ctrl && !win {
