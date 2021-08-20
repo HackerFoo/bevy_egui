@@ -4,6 +4,7 @@ use crate::{EguiContext, EguiInput, EguiOutput, EguiSettings, EguiShapes, Window
 #[cfg(feature = "open_url")]
 use bevy::log;
 use bevy::{
+    math::Vec2,
     app::EventReader,
     core::Time,
     ecs::system::{Local, Res, ResMut, SystemParam},
@@ -11,7 +12,7 @@ use bevy::{
         keyboard::KeyCode,
         mouse::{MouseButton, MouseScrollUnit, MouseWheel},
         Input,
-        touch::TouchInput
+        touch::{TouchInput, Touches}
     },
     utils::HashMap,
     window::{
@@ -36,6 +37,7 @@ pub struct InputResources<'w, 's> {
     #[cfg(feature = "manage_clipboard")]
     egui_clipboard: Res<'w, crate::EguiClipboard>,
     mouse_button_input: Res<'w, Input<MouseButton>>,
+    touches: Res<'w, Touches>,
     keyboard_input: Res<'w, Input<KeyCode>>,
     egui_input: ResMut<'w, HashMap<WindowId, EguiInput>>,
     #[system_param(ignore)]
@@ -148,22 +150,22 @@ pub fn process_input(
             .push(egui::Event::PointerGone);
         egui_context.mouse_position = None;
     }
+    let scale_factor = egui_settings.scale_factor as f32;
+    let to_egui_pos2 = |pos: Vec2, height: f32| {
+        let (x, y) = pos.into();
+        egui::pos2(x / scale_factor, (height - y) / scale_factor)
+    };
     if let Some(cursor_moved) = input_events.ev_cursor.iter().next_back() {
-        let scale_factor = egui_settings.scale_factor as f32;
-        let mut mouse_position: (f32, f32) = (cursor_moved.position / scale_factor).into();
-        mouse_position.1 = window_resources.window_sizes[&cursor_moved.id].height() / scale_factor
-            - mouse_position.1;
-        egui_context.mouse_position = Some(mouse_position);
+        let pos = to_egui_pos2(cursor_moved.position,
+                               window_resources.window_sizes[&cursor_moved.id].height());
+        egui_context.mouse_position = Some(pos.into());
         input_resources
             .egui_input
             .get_mut(&cursor_moved.id)
             .unwrap()
             .raw_input
             .events
-            .push(egui::Event::PointerMoved(egui::pos2(
-                mouse_position.0,
-                mouse_position.1,
-            )));
+            .push(egui::Event::PointerMoved(pos));
     }
 
     let focused_egui_input = input_resources
@@ -196,7 +198,30 @@ pub fn process_input(
         );
     }
 
+    if let Some(touch) = input_resources.touches.iter().next() {
+        let pos = to_egui_pos2(touch.position(),
+                               window_resources.window_sizes[&WindowId::primary()].height());
+        events.push(egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: true,
+            modifiers,
+        });
+    }
+    if let Some(touch) = input_resources.touches.iter_just_released().next() {
+        let pos = to_egui_pos2(touch.position(),
+                               window_resources.window_sizes[&WindowId::primary()].height());
+        events.push(egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers,
+        });
+    }
+
     for touch in input_events.ev_touch_input.iter() {
+        let pos = to_egui_pos2(touch.position,
+                               window_resources.window_sizes[&WindowId::primary()].height());
         events.push(egui::Event::Touch {
             device_id: egui::TouchDeviceId(0),
             id: egui::TouchId(touch.id),
@@ -206,7 +231,7 @@ pub fn process_input(
                 bevy::input::touch::TouchPhase::Ended =>     egui::TouchPhase::End,
                 bevy::input::touch::TouchPhase::Cancelled => egui::TouchPhase::Cancel
             },
-            pos: <[f32; 2]>::from(touch.position).into(),
+            pos,
             force: touch.force.map(|f| match f {
                 bevy::input::touch::ForceTouch::Calibrated { force, .. } => force,
                 bevy::input::touch::ForceTouch::Normalized(force) => force
