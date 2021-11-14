@@ -4,16 +4,16 @@ use crate::{EguiContext, EguiInput, EguiOutput, EguiSettings, EguiShapes, Window
 #[cfg(feature = "open_url")]
 use bevy::log;
 use bevy::{
-    math::Vec2,
     app::EventReader,
     core::Time,
     ecs::system::{Local, Res, ResMut, SystemParam},
     input::{
         keyboard::KeyCode,
         mouse::{MouseButton, MouseScrollUnit, MouseWheel},
+        touch::{TouchInput, Touches},
         Input,
-        touch::{TouchInput, Touches}
     },
+    math::Vec2,
     utils::HashMap,
     window::{
         CursorLeft, CursorMoved, ReceivedCharacter, WindowCreated, WindowFocused, WindowId, Windows,
@@ -156,8 +156,10 @@ pub fn process_input(
         egui::pos2(x / scale_factor, (height - y) / scale_factor)
     };
     if let Some(cursor_moved) = input_events.ev_cursor.iter().next_back() {
-        let pos = to_egui_pos2(cursor_moved.position,
-                               window_resources.window_sizes[&cursor_moved.id].height());
+        let pos = to_egui_pos2(
+            cursor_moved.position,
+            window_resources.window_sizes[&cursor_moved.id].height(),
+        );
         egui_context.mouse_position = Some(pos.into());
         input_resources
             .egui_input
@@ -199,8 +201,10 @@ pub fn process_input(
     }
 
     if let Some(touch) = input_resources.touches.iter().next() {
-        let pos = to_egui_pos2(touch.position(),
-                               window_resources.window_sizes[&WindowId::primary()].height());
+        let pos = to_egui_pos2(
+            touch.position(),
+            window_resources.window_sizes[&WindowId::primary()].height(),
+        );
         events.push(egui::Event::PointerButton {
             pos,
             button: egui::PointerButton::Primary,
@@ -209,8 +213,10 @@ pub fn process_input(
         });
     }
     if let Some(touch) = input_resources.touches.iter_just_released().next() {
-        let pos = to_egui_pos2(touch.position(),
-                               window_resources.window_sizes[&WindowId::primary()].height());
+        let pos = to_egui_pos2(
+            touch.position(),
+            window_resources.window_sizes[&WindowId::primary()].height(),
+        );
         events.push(egui::Event::PointerButton {
             pos,
             button: egui::PointerButton::Primary,
@@ -220,22 +226,27 @@ pub fn process_input(
     }
 
     for touch in input_events.ev_touch_input.iter() {
-        let pos = to_egui_pos2(touch.position,
-                               window_resources.window_sizes[&WindowId::primary()].height());
+        let pos = to_egui_pos2(
+            touch.position,
+            window_resources.window_sizes[&WindowId::primary()].height(),
+        );
         events.push(egui::Event::Touch {
             device_id: egui::TouchDeviceId(0),
             id: egui::TouchId(touch.id),
             phase: match touch.phase {
-                bevy::input::touch::TouchPhase::Started =>   egui::TouchPhase::Start,
-                bevy::input::touch::TouchPhase::Moved =>     egui::TouchPhase::Move,
-                bevy::input::touch::TouchPhase::Ended =>     egui::TouchPhase::End,
-                bevy::input::touch::TouchPhase::Cancelled => egui::TouchPhase::Cancel
+                bevy::input::touch::TouchPhase::Started => egui::TouchPhase::Start,
+                bevy::input::touch::TouchPhase::Moved => egui::TouchPhase::Move,
+                bevy::input::touch::TouchPhase::Ended => egui::TouchPhase::End,
+                bevy::input::touch::TouchPhase::Cancelled => egui::TouchPhase::Cancel,
             },
             pos,
-            force: touch.force.map(|f| match f {
-                bevy::input::touch::ForceTouch::Calibrated { force, .. } => force,
-                bevy::input::touch::ForceTouch::Normalized(force) => force
-            } as f32).unwrap_or(0.0)
+            force: touch
+                .force
+                .map(|f| match f {
+                    bevy::input::touch::ForceTouch::Calibrated { force, .. } => force,
+                    bevy::input::touch::ForceTouch::Normalized(force) => force,
+                } as f32)
+                .unwrap_or(0.0),
         });
     }
 
