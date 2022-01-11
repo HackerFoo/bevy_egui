@@ -460,6 +460,9 @@ pub fn setup_pipeline(
             config.egui_pass,
         )
         .unwrap();
+    render_graph
+        .add_node_edge(bevy::ui::node::UI_PASS_DRIVER, config.egui_pass)
+        .unwrap();
 }
 
 #[cfg(test)]
