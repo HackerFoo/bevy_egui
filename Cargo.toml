@@ -20,7 +20,7 @@ multi_threaded = ["egui/multi_threaded"]
 open_url = ["webbrowser"]
 
 [dependencies]
-bevy = { version = "0.6", default-features = false, features = [
+bevy = { version = "0.7.0-dev", default-features = false, features = [
     "bevy_render",
     "bevy_winit",
     "bevy_core_pipeline"
